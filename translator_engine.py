@@ -6,21 +6,19 @@ import config
 def translate(text):
     """
     Detects the source language and translates to TARGET_LANG.
-    Returns an empty string if the text is already in the target language.
+    Returns empty string if the text is already in the target language.
+    Only the message body should be passed here — not the nickname.
     """
     if not text:
         return ""
 
-    # Skip translation if already in target language
     try:
-        detected = detect(text)
-        if detected == config.TARGET_LANG:
+        if detect(text) == config.TARGET_LANG:
             return ""
     except LangDetectException:
-        pass  # Detection failed for short/ambiguous text — translate anyway
+        pass  # Can't detect (likely too short) — translate anyway
 
     try:
-        result = GoogleTranslator(source='auto', target=config.TARGET_LANG).translate(text)
-        return f"[번역] {result}"
+        return GoogleTranslator(source='auto', target=config.TARGET_LANG).translate(text)
     except Exception as e:
         return f"[번역 오류] {e}"

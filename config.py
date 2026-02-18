@@ -1,20 +1,18 @@
-# --- Screen Settings ---
-# Valorant chat is in the bottom-left of the screen.
-# Adjust these coordinates for your resolution.
-# Format: (x, y, width, height)
-CHAT_REGION = (5, 650, 500, 250)
+# --- Chat Region (percentage of screen, resolution-independent) ---
+# Valorant chat is always in the bottom-left corner.
+# Values are fractions of screen width/height (0.0 ~ 1.0).
+# Tweak if the chat region is slightly off on your setup.
+CHAT_REGION_PCT = (0.003, 0.778, 0.240, 0.195)  # (x, y, width, height)
 
 # --- Polling Settings ---
-# How often (in seconds) to check for new chat messages
-POLL_INTERVAL = 1.5
+POLL_INTERVAL = 1.5  # seconds between each chat check
 
 # --- Tesseract Path ---
-# If Tesseract-OCR is not in your PATH, specify the full path here.
 TESSERACT_CMD = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
 
 # --- Translation Settings ---
 TARGET_LANG = 'ko'
 
 # --- UI Settings ---
-OVERLAY_DURATION = 5  # seconds the translation overlay stays visible
-OVERLAY_ALPHA = 0.92  # overlay opacity (0.0 = transparent, 1.0 = opaque)
+OVERLAY_DURATION = 5   # seconds the overlay stays visible
+OVERLAY_ALPHA    = 0.92  # opacity (0.0 = transparent, 1.0 = opaque)

@@ -12,27 +12,48 @@ translation_queue = queue.Queue()
 
 def detection_loop():
     """
-    Runs in a background thread.
-    Continuously captures the chat region, extracts text via OCR,
-    and queues translations whenever the text changes.
+    Background thread: polls the chat region, detects new lines,
+    translates messages (preserving nicknames), and queues results.
     """
-    prev_text = ""
-    print(f"[{time.strftime('%H:%M:%S')}] 채팅 감지 시작 (폴링 간격: {config.POLL_INTERVAL}초)")
+    seen_lines = set()
+    print(f"[{time.strftime('%H:%M:%S')}] 채팅 감지 시작 (폴링: {config.POLL_INTERVAL}초)")
 
     while True:
         try:
-            image = ocr_engine.capture_chat()
-            text = ocr_engine.extract_text(image)
+            region = ocr_engine.get_chat_region()
+            image  = ocr_engine.capture_chat()
+            lines  = ocr_engine.extract_lines(image)
 
-            if text and text != prev_text:
-                prev_text = text
-                preview = text[:60].replace('\n', ' ')
-                print(f"[{time.strftime('%H:%M:%S')}] 새 채팅 감지: {preview}")
+            # Find lines not seen before
+            new_lines = [l for l in lines if l not in seen_lines]
+            for l in new_lines:
+                seen_lines.add(l)
 
-                translated = translator_engine.translate(text)
+            translated_entries = []
+            for line in new_lines:
+                nickname, message = ocr_engine.parse_chat_line(line)
+                if nickname is None:
+                    continue
+
+                print(f"[{time.strftime('%H:%M:%S')}] 감지: {nickname}: {message[:50]}")
+
+                translated = translator_engine.translate(message)
                 if translated:
-                    print(f"[{time.strftime('%H:%M:%S')}] 번역 완료: {translated[:60]}")
-                    translation_queue.put(translated)
+                    print(f"[{time.strftime('%H:%M:%S')}] 번역: {nickname}: {translated[:50]}")
+                    translated_entries.append({
+                        'nickname':   nickname,
+                        'translated': translated,
+                    })
+
+            if translated_entries:
+                translation_queue.put({
+                    'lines':  translated_entries,
+                    'region': region,
+                })
+
+            # Prevent seen_lines from growing forever (e.g. between matches)
+            if len(seen_lines) > 300:
+                seen_lines = set(list(seen_lines)[-150:])
 
         except Exception as e:
             print(f"[{time.strftime('%H:%M:%S')}] [오류] {e}")
@@ -41,20 +62,24 @@ def detection_loop():
 
 
 def main():
+    sw, sh = __import__('pyautogui').size()
+    region = ocr_engine.get_chat_region()
+
     print("=" * 50)
     print("  발로란트 실시간 번역기")
     print("=" * 50)
-    print(f"  감지 영역: {config.CHAT_REGION}")
-    print(f"  번역 대상: {config.TARGET_LANG}")
-    print(f"  폴링 간격: {config.POLL_INTERVAL}초")
+    print(f"  화면 해상도   : {sw} x {sh}")
+    print(f"  채팅 감지 영역: {region}")
+    print(f"  번역 목표 언어: {config.TARGET_LANG}")
+    print(f"  폴링 간격     : {config.POLL_INTERVAL}초")
     print("  종료: Ctrl+C")
     print("=" * 50)
+    print("※ 발로란트를 '테두리 없는 창 모드'로 설정해야 오버레이가 표시됩니다.")
+    print()
 
-    # Start chat detection in a background daemon thread
     thread = threading.Thread(target=detection_loop, daemon=True)
     thread.start()
 
-    # Run Tkinter overlay manager in the main thread (required for GUI)
     overlay.run_overlay_manager(translation_queue)
 
 
