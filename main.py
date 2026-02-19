@@ -33,6 +33,14 @@ HOTKEYS = {
     'F5': 'f5', 'F6': 'f6', 'F7': 'f7', 'F8': 'f8',
     'F9': 'f9', 'F10': 'f10', 'F11': 'f11', 'F12': 'f12',
     'Insert': 'insert', 'Pause': 'pause', 'Scroll Lock': 'scroll lock',
+    'Ctrl+1': 'ctrl+1', 'Ctrl+2': 'ctrl+2', 'Ctrl+3': 'ctrl+3',
+    'Ctrl+4': 'ctrl+4', 'Ctrl+5': 'ctrl+5',
+    'Ctrl+F5': 'ctrl+f5', 'Ctrl+F6': 'ctrl+f6',
+    'Ctrl+F7': 'ctrl+f7', 'Ctrl+F8': 'ctrl+f8',
+    'Ctrl+F9': 'ctrl+f9', 'Ctrl+F10': 'ctrl+f10',
+    'Alt+F5': 'alt+f5', 'Alt+F6': 'alt+f6',
+    'Alt+F7': 'alt+f7', 'Alt+F8': 'alt+f8',
+    'Alt+F9': 'alt+f9', 'Alt+F10': 'alt+f10',
 }
 HOTKEY_DISPLAY = {v: k for k, v in HOTKEYS.items()}
 
