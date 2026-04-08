@@ -403,7 +403,7 @@ class App(tk.Tk):
                 'OCR 초기화 중... (최초 1회, 잠시 기다려 주세요)', tag='dst'))
             import easyocr
             self._ocr_reader = easyocr.Reader(
-                ['ko', 'en', 'ja', 'ch_sim', 'ru', 'vi', 'th'],
+                ['ko', 'en', 'ja', 'ch_sim', 'ru', 'vi'],
                 gpu=False,
                 verbose=False,
             )
