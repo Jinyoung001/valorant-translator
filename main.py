@@ -80,7 +80,6 @@ class ChatOverlay(tk.Toplevel):
         self._drag_x = 0
         self._drag_y = 0
 
-        # 드래그 바 (상단 핸들)
         drag_bar = tk.Frame(self, bg=ENTRY_BG, height=20, cursor='fleur')
         drag_bar.pack(fill='x')
         drag_bar.pack_propagate(False)
@@ -93,15 +92,12 @@ class ChatOverlay(tk.Toplevel):
                              font=('Segoe UI', 11, 'bold'), cursor='hand2')
         close_btn.pack(side='right', padx=(0, 6))
 
-        # 드래그: drag_bar 본체 + 타이틀 레이블에만 바인딩
         for w in (drag_bar, title_lbl):
             w.bind('<ButtonPress-1>', self._drag_start)
             w.bind('<B1-Motion>',     self._drag_move)
 
-        # 닫기: close_btn 전용
         close_btn.bind('<Button-1>', lambda e: self.withdraw())
 
-        # 번역 텍스트 박스
         self._text = tk.Text(
             self, bg=BG, fg=TEXT,
             font=('Consolas', 9), relief='flat',
@@ -114,7 +110,6 @@ class ChatOverlay(tk.Toplevel):
         self._text.tag_config('arr',   foreground=ACCENT)
         self._text.tag_config('trans', foreground=SUCCESS)
 
-        # 초기 위치
         ox, oy = config.OVERLAY_POS
         self.geometry(f'+{ox}+{oy}')
 
@@ -135,9 +130,7 @@ class ChatOverlay(tk.Toplevel):
             self._text.insert('end', orig,         'orig')
             self._text.insert('end', ' → ',        'arr')
             self._text.insert('end', trans + '\n', 'trans')
-        # 줄 수에 따라 높이 조정 (최소 3, 최대 10)
-        self._text.configure(height=max(3, min(10, len(pairs) + 1)))
-        self._text.configure(state='disabled')
+        self._text.configure(height=max(3, min(10, len(pairs) + 1)), state='disabled')
 
         self.deiconify()
         self.lift()
@@ -162,13 +155,14 @@ class App(tk.Tk):
         self.src_code         = config.SOURCE_LANG
         self.tgt_code         = config.TARGET_LANG
         self.translator       = GoogleTranslator(source=self.src_code, target=self.tgt_code)
+        self._ko_translator   = GoogleTranslator(source='auto', target='ko')
 
         self._setup_ttk_style()
         self._build_ui()
 
         self.chat_overlay = ChatOverlay(self)
-        self._register_hotkey(self._current_hotkey)
-        self._register_read_hotkey(self._read_hotkey)
+        keyboard.add_hotkey(self._current_hotkey, self._on_hotkey)
+        keyboard.add_hotkey(self._read_hotkey,    self._on_read_hotkey)
 
     def _init_translator(self):
         self.translator = GoogleTranslator(source=self.src_code, target=self.tgt_code)
@@ -328,21 +322,8 @@ class App(tk.Tk):
         self._init_translator()
         self._chat_region = new_region
 
-        if new_hotkey != self._current_hotkey:
-            try:
-                keyboard.remove_hotkey(self._current_hotkey)
-            except Exception:
-                pass
-            self._current_hotkey = new_hotkey
-            self._register_hotkey(new_hotkey)
-
-        if new_read_hk != self._read_hotkey:
-            try:
-                keyboard.remove_hotkey(self._read_hotkey)
-            except Exception:
-                pass
-            self._read_hotkey = new_read_hk
-            self._register_read_hotkey(new_read_hk)
+        self._swap_hotkey('_current_hotkey', new_hotkey,  self._on_hotkey)
+        self._swap_hotkey('_read_hotkey',    new_read_hk, self._on_read_hotkey)
 
         self._add_log(
             f'설정 변경: {src_name} → {tgt_name}  |  전송:{hk_name}  읽기:{rhk_name}  해상도:{res_name}',
@@ -375,9 +356,16 @@ class App(tk.Tk):
     def add_error(self, msg):
         self.after(0, lambda: self._add_log(f'[오류] {msg}', tag='err'))
 
-    # ── 전송 번역 핫키 ────────────────────────────────────────
-    def _register_hotkey(self, hotkey):
-        keyboard.add_hotkey(hotkey, self._on_hotkey)
+    def _swap_hotkey(self, attr, new_hotkey, callback):
+        old = getattr(self, attr)
+        if new_hotkey == old:
+            return
+        try:
+            keyboard.remove_hotkey(old)
+        except Exception:
+            pass
+        setattr(self, attr, new_hotkey)
+        keyboard.add_hotkey(new_hotkey, callback)
 
     def _on_hotkey(self):
         threading.Thread(target=self._translate, daemon=True).start()
@@ -406,10 +394,6 @@ class App(tk.Tk):
 
         self.add_translation(text, translated)
 
-    # ── 읽기 핫키 (화면 OCR → 번역) ──────────────────────────
-    def _register_read_hotkey(self, hotkey):
-        keyboard.add_hotkey(hotkey, self._on_read_hotkey)
-
     def _on_read_hotkey(self):
         threading.Thread(target=self._read_chat, daemon=True).start()
 
@@ -426,7 +410,6 @@ class App(tk.Tk):
         return self._ocr_reader
 
     def _read_chat(self):
-        # 1. 채팅 영역 스크린샷
         x, y, w, h = self._chat_region
         try:
             with mss.mss() as sct:
@@ -435,16 +418,13 @@ class App(tk.Tk):
             self.add_error(f'화면 캡처 실패: {e}')
             return
 
-        # 2. 전처리 (흑백 + 2배 확대 + 대비 강화)
         pil_img = Image.frombytes('RGB', raw.size, raw.rgb).convert('L')
         pil_img = pil_img.resize(
             (pil_img.width * 2, pil_img.height * 2), Image.LANCZOS)
         pil_img = ImageEnhance.Contrast(pil_img).enhance(2.5)
 
-        # 3. OCR
         try:
-            reader  = self._get_ocr_reader()
-            results = reader.readtext(np.array(pil_img), detail=1)
+            results = self._get_ocr_reader().readtext(np.array(pil_img), detail=1)
         except Exception as e:
             self.add_error(f'OCR 실패: {e}')
             return
@@ -457,18 +437,15 @@ class App(tk.Tk):
                 '채팅 텍스트를 인식하지 못했습니다', tag='dst'))
             return
 
-        # 4. 번역 (한국어가 아닌 줄만)
-        ko_translator = GoogleTranslator(source='auto', target='ko')
         pairs = []
         for line in lines:
             try:
-                translated = ko_translator.translate(line)
+                translated = self._ko_translator.translate(line)
                 if translated and translated.strip() != line.strip():
                     pairs.append((line, translated))
             except Exception:
                 pass
 
-        # 5. 오버레이 + 로그 업데이트
         if pairs:
             self.after(0, lambda p=pairs: self.chat_overlay.show_lines(p))
             for src, dst in pairs:
